@@ -1,0 +1,67 @@
+spring:
+  data:
+    redis:
+      repositories:
+        enabled: false
+  application:
+    name: queue-api
+  profiles:
+    active: local
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8081
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+ticketingflow:
+  queue:
+    admit-per-tick: 100      # 틱당 입장 허용 인원
+    tick-ms: 1000            # 승격 주기
+    active-ttl-sec: 600      # 입장 후 예매 가능 시간(초)
+    ws-port: 8091            # Netty WebSocket 푸시 포트
+    ws-push-ms: 1000         # 순번 푸시 주기
+  jwt:
+    secret: ${JWT_SECRET:ticketingflow-dev-secret-please-override-with-32byte-min-key}
+    expiry-minutes: 120
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+ticketingflow:
+  redis:
+    queue:
+      host: ${REDIS_QUEUE_HOST:localhost}
+      port: ${REDIS_QUEUE_PORT:6379}
+    active:
+      host: ${REDIS_ACTIVE_HOST:localhost}
+      port: ${REDIS_ACTIVE_PORT:6379}
+    booking:
+      host: ${REDIS_BOOKING_HOST:localhost}
+      port: ${REDIS_BOOKING_PORT:6379}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+ticketingflow:
+  redis:
+    queue:
+      host: tr-redis-queue
+      port: 6379
+    active:
+      host: tr-redis-active
+      port: 6379
+    booking:
+      host: tr-redis-booking
+      port: 6379
