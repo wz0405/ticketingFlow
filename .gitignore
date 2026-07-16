@@ -1,0 +1,44 @@
+# --- secrets (절대 커밋 금지) ---
+.env
+*.env
+!*.env.example
+infra/deploy.config
+
+# --- backend (gradle) ---
+.gradle/
+**/build/
+!src/**/build/
+bin/
+out/
+
+# --- frontend (flutter) ---
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# --- misc ---
+*.log
+
+# Docker 볼륨 디렉토리 (배포 시 생기는 것, 소스 아님)
+/infra/mysql/
+/infra/redis/
+/infra/redis-booking/
+/mysql/
+/redis/
+/redis-booking/
+
+# TLS 인증서 (커밋 금지)
+/infra/certs/
+
+# 설계 상세 문서는 로컬 보관 (원격 비공개)
+docs/

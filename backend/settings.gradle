@@ -1,0 +1,6 @@
+rootProject.name = 'ticketingflow-backend'
+
+include 'common'
+include 'queue-api'
+include 'booking-api'
+include 'worker'
