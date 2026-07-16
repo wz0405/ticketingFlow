@@ -6,4 +6,5 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    testImplementation 'org.testcontainers:junit-jupiter'
 }
