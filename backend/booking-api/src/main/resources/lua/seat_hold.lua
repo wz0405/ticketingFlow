@@ -11,9 +11,12 @@ local now = tonumber(ARGV[2])
 local function holdable(v)
     if not v then return false end
     if v == 'A' then return true end
-    -- 만료된 HOLD는 즉시 재선점 가능 (lazy expiry)
-    local expire = string.match(v, '^H:[^:]+:(%d+)$')
-    return expire ~= nil and tonumber(expire) < now
+    local owner, expire = string.match(v, '^H:([^:]+):(%d+)$')
+    if not owner then return false end
+    -- 본인 HOLD는 재선점 허용 (좌석 추가 선택 시 전체 재선점 → TTL 갱신)
+    if owner == ARGV[1] then return true end
+    -- 만료된 타인 HOLD는 즉시 재선점 가능 (lazy expiry)
+    return tonumber(expire) < now
 end
 
 for i = 4, #ARGV do

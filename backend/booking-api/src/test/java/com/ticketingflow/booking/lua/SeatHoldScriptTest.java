@@ -107,6 +107,20 @@ class SeatHoldScriptTest {
     }
 
     @Test
+    @DisplayName("본인의 유효한 HOLD는 재선점되며 만료시각이 갱신된다 (좌석 추가 선택 플로우)")
+    void ownLiveHold_isReholdableWithRefreshedTtl() {
+        long now = System.currentTimeMillis();
+        redis.opsForHash().put(KEY, "A-01", "H:me:" + (now + 1_000));
+        redis.opsForHash().put(KEY, "A-02", RedisKeys.SEAT_AVAILABLE);
+
+        List<?> rslt = hold("me", now, "A-01", "A-02");
+
+        assertThat(code(rslt)).isZero();
+        assertThat(value("A-01")).isEqualTo("H:me:" + (now + HOLD_MS));
+        assertThat(value("A-02")).isEqualTo("H:me:" + (now + HOLD_MS));
+    }
+
+    @Test
     @DisplayName("유효한 타인 HOLD는 선점 불가(2)로 거절되고 상태가 보존된다")
     void liveForeignHold_isRejected() {
         long now = System.currentTimeMillis();
