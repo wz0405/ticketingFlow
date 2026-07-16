@@ -1,0 +1,7 @@
+# 배포 대상 접속정보 템플릿. deploy.config 로 복사해 사용한다 (deploy.config는 커밋 금지)
+NAS_HOST=192.168.0.1
+NAS_PORT=22
+NAS_USER=admin
+NAS_PASS=changeme
+NAS_DIR=/volume1/docker/ticketingflow
+WEB_DIR=C:\path\to\ticketingFlow\frontend

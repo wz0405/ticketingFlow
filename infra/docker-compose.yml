@@ -1,0 +1,128 @@
+services:
+  tr-mysql:
+    image: mysql:8.0
+    container_name: tr-mysql
+    restart: unless-stopped
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-ticketingflow}
+      MYSQL_USER: ${DB_USER:-hhhan}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+      - --max-connections=300
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ticketingflow
+
+  # 역할별 Redis 3계통 — 대기열/입장(active)/예매(좌석·재고·스트림)를 물리 분리
+  tr-redis-queue:
+    image: redis:7-alpine
+    container_name: tr-redis-queue
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    # 대기열은 휘발성이라 영속화 최소 (재구성 가능)
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - ticketingflow
+
+  tr-redis-active:
+    image: redis:7-alpine
+    container_name: tr-redis-active
+    restart: unless-stopped
+    ports:
+      - "16380:6379"
+    # 입장 상태는 TTL로 관리, 영속화 불필요
+    command: redis-server --maxmemory 256mb --maxmemory-policy volatile-ttl
+    networks:
+      - ticketingflow
+
+  tr-redis-booking:
+    image: redis:7-alpine
+    container_name: tr-redis-booking
+    restart: unless-stopped
+    ports:
+      - "16381:6379"
+    # 좌석/재고/스트림은 내구성 필요 → AOF, eviction 금지
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy noeviction
+    volumes:
+      - ./redis-booking:/data
+    networks:
+      - ticketingflow
+
+  tr-queue-api:
+    image: ticketingflow/queue-api:latest
+    container_name: tr-queue-api
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET}
+      JAVA_OPTS: -Xms128m -Xmx384m
+    depends_on:
+      - tr-redis-queue
+      - tr-redis-active
+    networks:
+      - ticketingflow
+
+  tr-booking-api:
+    image: ticketingflow/booking-api:latest
+    container_name: tr-booking-api
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_USER: ${DB_USER:-hhhan}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JAVA_OPTS: -Xms128m -Xmx384m
+    depends_on:
+      - tr-redis-active
+      - tr-redis-booking
+      - tr-mysql
+    networks:
+      - ticketingflow
+
+  tr-worker:
+    image: ticketingflow/worker:latest
+    container_name: tr-worker
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_USER: ${DB_USER:-hhhan}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JAVA_OPTS: -Xms128m -Xmx256m
+    depends_on:
+      - tr-redis-booking
+      - tr-mysql
+    networks:
+      - ticketingflow
+
+  tr-nginx:
+    image: nginx:1.27-alpine
+    container_name: tr-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:8080"      # HTTP
+      - "18443:8443"     # HTTPS (nginx가 직접 TLS 종단). 호스트 18443 → 컨테이너 8443
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/routes.inc:/etc/nginx/conf.d/routes.inc:ro
+      - ./web:/usr/share/nginx/html:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - tr-queue-api
+      - tr-booking-api
+    networks:
+      - ticketingflow
+
+networks:
+  ticketingflow:
+    driver: bridge
