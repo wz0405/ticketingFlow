@@ -1,0 +1,82 @@
+spring:
+  data:
+    redis:
+      repositories:
+        enabled: false
+  application:
+    name: booking-api
+  profiles:
+    active: local
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8082
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+ticketingflow:
+  booking:
+    hold-ttl-sec: 300
+    max-seats-per-rsv: 4
+    max-qty-per-ord: 10
+  jwt:
+    secret: ${JWT_SECRET:ticketingflow-dev-secret-please-override-with-32byte-min-key}
+    expiry-minutes: 120
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ticketingflow}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul
+    username: ${DB_USER:hhhan}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+ticketingflow:
+  redis:
+    queue:
+      host: ${REDIS_QUEUE_HOST:localhost}
+      port: ${REDIS_QUEUE_PORT:6379}
+    active:
+      host: ${REDIS_ACTIVE_HOST:localhost}
+      port: ${REDIS_ACTIVE_PORT:6379}
+    booking:
+      host: ${REDIS_BOOKING_HOST:localhost}
+      port: ${REDIS_BOOKING_PORT:6379}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:mysql://tr-mysql:3306/${DB_NAME:ticketingflow}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul
+    username: ${DB_USER:hhhan}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 20
+ticketingflow:
+  redis:
+    queue:
+      host: tr-redis-queue
+      port: 6379
+    active:
+      host: tr-redis-active
+      port: 6379
+    booking:
+      host: tr-redis-booking
+      port: 6379

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketingflow.booking.mapper.EventMapper">
+
+    <select id="selectEventList" resultType="com.ticketingflow.booking.domain.EventRow">
+        SELECT tbevEvnt.EVNT_NO,
+               tbevEvnt.EVNT_NM,
+               tbevEvnt.VENUE_NM,
+               tbevEvnt.EVNT_ST_CD,
+               tbevSchd.SCHD_NO,
+               tbevSchd.SCHD_DT,
+               tbevSchd.OPEN_DT,
+               tbevSchd.TOT_SEAT_CNT
+          FROM TBEV_EVNT tbevEvnt
+          JOIN TBEV_SCHD tbevSchd
+            ON tbevSchd.EVNT_NO = tbevEvnt.EVNT_NO
+         WHERE tbevEvnt.EVNT_ST_CD = '1'
+         ORDER BY tbevSchd.SCHD_DT
+    </select>
+
+    <select id="selectSeatNos" resultType="string">
+        SELECT tbevSeat.SEAT_NO
+          FROM TBEV_SEAT tbevSeat
+         WHERE tbevSeat.SCHD_NO = #{schdNo}
+    </select>
+
+    <!-- 판매완료 좌석: 확정 원장 중 취소 row가 없는 건 -->
+    <select id="selectSoldSeats" resultType="com.ticketingflow.booking.domain.SoldSeat">
+        SELECT tbtrRsvSeat.SEAT_NO,
+               tbtrRsv.USR_ID
+          FROM TBTR_RSV tbtrRsv
+          JOIN TBTR_RSV_SEAT tbtrRsvSeat
+            ON tbtrRsvSeat.RSV_NO = tbtrRsv.RSV_NO
+          LEFT JOIN TBTR_RSV cnclRsv
+            ON cnclRsv.ORSV_NO = tbtrRsv.RSV_NO
+           AND cnclRsv.RSV_ST_CD = '2'
+         WHERE tbtrRsv.SCHD_NO = #{schdNo}
+           AND tbtrRsv.RSV_ST_CD = '0'
+           AND cnclRsv.RSV_NO IS NULL
+    </select>
+
+    <select id="selectSeatMaster" resultType="com.ticketingflow.booking.domain.SeatMaster">
+        SELECT tbevSeat.SEAT_NO,
+               tbevSeat.SEAT_GRD_CD,
+               tbevSeat.SEAT_PRC
+          FROM TBEV_SEAT tbevSeat
+         WHERE tbevSeat.SCHD_NO = #{schdNo}
+         ORDER BY tbevSeat.SEAT_NO
+    </select>
+
+    <select id="selectSeatPrices" resultType="com.ticketingflow.booking.domain.SeatPrice">
+        SELECT tbevSeat.SEAT_NO,
+               tbevSeat.SEAT_PRC
+          FROM TBEV_SEAT tbevSeat
+         WHERE tbevSeat.SCHD_NO = #{schdNo}
+           AND tbevSeat.SEAT_NO IN
+        <foreach collection="seatNos" item="seatNo" open="(" separator="," close=")">
+            #{seatNo}
+        </foreach>
+    </select>
+
+    <select id="selectPrdList" resultType="com.ticketingflow.booking.domain.PrdRow">
+        SELECT tbpdPrd.PRD_NO,
+               tbpdPrd.PRD_NM,
+               tbpdPrd.PRD_TYPE_CD,
+               tbpdPrd.PRD_PRC
+          FROM TBPD_PRD tbpdPrd
+         WHERE tbpdPrd.SCHD_NO = #{schdNo}
+         ORDER BY tbpdPrd.PRD_NO
+    </select>
+
+    <!-- 잔여재고 = 초기재고 - 유효 주문수량 합 (취소 row는 음수라 SUM만으로 상계) -->
+    <select id="selectPrdRemains" resultType="com.ticketingflow.booking.domain.PrdRemain">
+        SELECT tbpdPrd.PRD_NO,
+               tbpdPrd.STOCK_QTY - IFNULL(ordSum.ORD_QTY_SUM, 0) AS REMAIN_QTY
+          FROM TBPD_PRD tbpdPrd
+          LEFT JOIN (
+                SELECT tbtrOrdItem.PRD_NO,
+                       SUM(tbtrOrdItem.ORD_QTY) AS ORD_QTY_SUM
+                  FROM TBTR_ORD tbtrOrd
+                  JOIN TBTR_ORD_ITEM tbtrOrdItem
+                    ON tbtrOrdItem.ORD_NO = tbtrOrd.ORD_NO
+                 WHERE tbtrOrd.SCHD_NO = #{schdNo}
+                 GROUP BY tbtrOrdItem.PRD_NO
+               ) ordSum
+            ON ordSum.PRD_NO = tbpdPrd.PRD_NO
+         WHERE tbpdPrd.SCHD_NO = #{schdNo}
+    </select>
+
+    <select id="selectPrdPrices" resultType="com.ticketingflow.booking.domain.PrdPrice">
+        SELECT tbpdPrd.PRD_NO,
+               tbpdPrd.PRD_PRC
+          FROM TBPD_PRD tbpdPrd
+         WHERE tbpdPrd.SCHD_NO = #{schdNo}
+           AND tbpdPrd.PRD_NO IN
+        <foreach collection="prdNos" item="prdNo" open="(" separator="," close=")">
+            #{prdNo}
+        </foreach>
+    </select>
+
+</mapper>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketingflow.booking.mapper.RsvMapper">
+
+    <select id="selectRsvForCancel" resultType="com.ticketingflow.booking.domain.RsvForCancel">
+        SELECT tbtrRsv.RSV_NO,
+               tbtrRsv.USR_ID,
+               tbtrRsv.SCHD_NO,
+               tbtrRsv.TOT_AMT,
+               tbtrRsv.SEAT_CNT,
+               COUNT(cnclRsv.RSV_NO) AS CNCL_CNT
+          FROM TBTR_RSV tbtrRsv
+          LEFT JOIN TBTR_RSV cnclRsv
+            ON cnclRsv.ORSV_NO = tbtrRsv.RSV_NO
+           AND cnclRsv.RSV_ST_CD = '2'
+         WHERE tbtrRsv.RSV_NO = #{rsvNo}
+           AND tbtrRsv.RSV_ST_CD = '0'
+         GROUP BY tbtrRsv.RSV_NO, tbtrRsv.USR_ID, tbtrRsv.SCHD_NO, tbtrRsv.TOT_AMT, tbtrRsv.SEAT_CNT
+    </select>
+
+    <select id="selectRsvSeats" resultType="com.ticketingflow.event.SeatLine">
+        SELECT tbtrRsvSeat.SEAT_NO,
+               tbtrRsvSeat.SEAT_PRC
+          FROM TBTR_RSV_SEAT tbtrRsvSeat
+         WHERE tbtrRsvSeat.RSV_NO = #{rsvNo}
+         ORDER BY tbtrRsvSeat.SEAT_NO
+    </select>
+
+    <!-- 표시 상태: 취소 row 존재 시 '2' (원장 UPDATE 없이 계산) -->
+    <select id="selectMyRsvs" resultType="com.ticketingflow.booking.domain.MyRsvRow">
+        SELECT tbtrRsv.RSV_NO,
+               tbtrRsv.SCHD_NO,
+               tbevEvnt.EVNT_NM,
+               tbevSchd.SCHD_DT,
+               tbtrRsv.SEAT_CNT,
+               tbtrRsv.TOT_AMT,
+               tbtrRsv.TRX_DT,
+               CASE WHEN COUNT(cnclRsv.RSV_NO) > 0 THEN '2' ELSE '0' END AS RSV_ST_CD,
+               GROUP_CONCAT(DISTINCT tbtrRsvSeat.SEAT_NO ORDER BY tbtrRsvSeat.SEAT_NO) AS SEAT_NOS
+          FROM TBTR_RSV tbtrRsv
+          JOIN TBEV_SCHD tbevSchd
+            ON tbevSchd.SCHD_NO = tbtrRsv.SCHD_NO
+          JOIN TBEV_EVNT tbevEvnt
+            ON tbevEvnt.EVNT_NO = tbevSchd.EVNT_NO
+          JOIN TBTR_RSV_SEAT tbtrRsvSeat
+            ON tbtrRsvSeat.RSV_NO = tbtrRsv.RSV_NO
+          LEFT JOIN TBTR_RSV cnclRsv
+            ON cnclRsv.ORSV_NO = tbtrRsv.RSV_NO
+           AND cnclRsv.RSV_ST_CD = '2'
+         WHERE tbtrRsv.USR_ID = #{usrId}
+           AND tbtrRsv.RSV_ST_CD = '0'
+         GROUP BY tbtrRsv.RSV_NO, tbtrRsv.SCHD_NO, tbevEvnt.EVNT_NM, tbevSchd.SCHD_DT,
+                  tbtrRsv.SEAT_CNT, tbtrRsv.TOT_AMT, tbtrRsv.TRX_DT
+         ORDER BY tbtrRsv.TRX_DT DESC
+    </select>
+
+</mapper>
