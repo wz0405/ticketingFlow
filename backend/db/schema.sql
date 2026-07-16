@@ -1,0 +1,122 @@
+SET NAMES utf8mb4;
+-- =====================================================================
+-- TicketingFlow DDL (MySQL 8.0, utf8mb4)
+--
+-- 설계 원칙
+--   * 거래 원장(TBTR_*)은 INSERT-only. UPDATE/DELETE 금지.
+--   * 취소는 취소 row를 새로 적재하고 ORSV_NO 로 원거래를 참조한다.
+--     (승인 시 ORSV_NO = RSV_NO, 무조건)
+--   * 좌석 실시간 상태의 진실원천은 Redis. RDB는 확정 원장 + 조회용.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS TBMB_USR (
+    USR_ID      VARCHAR(36)  NOT NULL COMMENT '회원ID (UUID)',
+    USR_NM      VARCHAR(50)  NOT NULL COMMENT '회원명(로그인 키)',
+    REG_DT      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (USR_ID),
+    UNIQUE KEY UK_TBMB_USR_NM (USR_NM)
+) COMMENT='회원';
+
+CREATE TABLE IF NOT EXISTS TBEV_EVNT (
+    EVNT_NO     VARCHAR(20)  NOT NULL COMMENT '이벤트번호 (E+seq)',
+    EVNT_NM     VARCHAR(100) NOT NULL COMMENT '이벤트명',
+    VENUE_NM    VARCHAR(100) NULL     COMMENT '공연장',
+    EVNT_ST_CD  CHAR(1)      NOT NULL DEFAULT '0' COMMENT '0=판매예정 1=판매중 2=종료',
+    REG_DT      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (EVNT_NO)
+) COMMENT='이벤트(공연) 마스터';
+
+CREATE TABLE IF NOT EXISTS TBEV_SCHD (
+    SCHD_NO      VARCHAR(20) NOT NULL COMMENT '회차번호 (S+seq)',
+    EVNT_NO      VARCHAR(20) NOT NULL,
+    SCHD_DT      DATETIME    NOT NULL COMMENT '공연일시',
+    OPEN_DT      DATETIME    NOT NULL COMMENT '예매오픈일시',
+    TOT_SEAT_CNT INT         NOT NULL COMMENT '총좌석수',
+    REG_DT       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (SCHD_NO),
+    KEY IX_TBEV_SCHD_EVNT (EVNT_NO)
+) COMMENT='이벤트 회차';
+
+CREATE TABLE IF NOT EXISTS TBEV_SEAT (
+    SCHD_NO     VARCHAR(20)   NOT NULL,
+    SEAT_NO     VARCHAR(10)   NOT NULL COMMENT '좌석번호 (A-01 형식)',
+    SEAT_GRD_CD CHAR(1)       NOT NULL DEFAULT 'R' COMMENT 'V=VIP R=일반',
+    SEAT_PRC    DECIMAL(12,0) NOT NULL COMMENT '좌석가격',
+    PRIMARY KEY (SCHD_NO, SEAT_NO)
+) COMMENT='회차별 좌석 마스터';
+
+CREATE TABLE IF NOT EXISTS TBTR_RSV (
+    RSV_NO      VARCHAR(20)   NOT NULL COMMENT '예매번호 (R+yyMMdd+seq)',
+    ORSV_NO     VARCHAR(20)   NOT NULL COMMENT '원예매번호. 승인 시 자기자신',
+    USR_ID      VARCHAR(36)   NOT NULL,
+    SCHD_NO     VARCHAR(20)   NOT NULL,
+    RSV_ST_CD   CHAR(1)       NOT NULL COMMENT '0=예매확정 2=취소',
+    SEAT_CNT    INT           NOT NULL,
+    TOT_AMT     DECIMAL(12,0) NOT NULL COMMENT '취소 row는 음수',
+    TRX_DT      DATETIME(3)   NOT NULL COMMENT '거래시각(Redis 확정시각)',
+    REG_DT      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'DB적재시각',
+    PRIMARY KEY (RSV_NO),
+    KEY IX_TBTR_RSV_USR  (USR_ID, TRX_DT),
+    KEY IX_TBTR_RSV_SCHD (SCHD_NO),
+    KEY IX_TBTR_RSV_ORSV (ORSV_NO)
+) COMMENT='예매 원장 (INSERT-only)';
+
+CREATE TABLE IF NOT EXISTS TBTR_RSV_SEAT (
+    RSV_NO      VARCHAR(20)   NOT NULL,
+    SEAT_NO     VARCHAR(10)   NOT NULL,
+    SEAT_PRC    DECIMAL(12,0) NOT NULL,
+    PRIMARY KEY (RSV_NO, SEAT_NO)
+) COMMENT='예매 좌석 상세';
+
+CREATE TABLE IF NOT EXISTS TBTR_RSV_HIST (
+    HIST_SEQ    BIGINT        NOT NULL AUTO_INCREMENT,
+    RSV_NO      VARCHAR(20)   NOT NULL,
+    RSV_ST_CD   CHAR(1)       NOT NULL,
+    HIST_MSG    VARCHAR(200)  NULL,
+    REG_DT      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (HIST_SEQ),
+    KEY IX_TBTR_RSV_HIST_RSV (RSV_NO)
+) COMMENT='예매 처리 이력 (append-only)';
+
+CREATE TABLE IF NOT EXISTS TBPD_PRD (
+    PRD_NO      VARCHAR(20)   NOT NULL COMMENT '상품번호 (P+seq)',
+    SCHD_NO     VARCHAR(20)   NOT NULL COMMENT '판매 회차',
+    PRD_NM      VARCHAR(100)  NOT NULL COMMENT '상품명',
+    PRD_TYPE_CD CHAR(1)       NOT NULL DEFAULT 'G' COMMENT 'T=수량제티켓(스탠딩) G=굿즈',
+    PRD_PRC     DECIMAL(12,0) NOT NULL,
+    STOCK_QTY   INT           NOT NULL COMMENT '초기 재고. 실시간 잔량의 진실원천은 Redis',
+    REG_DT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (PRD_NO),
+    KEY IX_TBPD_PRD_SCHD (SCHD_NO)
+) COMMENT='수량제 재고 상품 마스터';
+
+CREATE TABLE IF NOT EXISTS TBTR_ORD (
+    ORD_NO      VARCHAR(20)   NOT NULL COMMENT '주문번호 (O+yyMMdd+seq)',
+    OORD_NO     VARCHAR(20)   NOT NULL COMMENT '원주문번호. 승인 시 자기자신',
+    USR_ID      VARCHAR(36)   NOT NULL,
+    SCHD_NO     VARCHAR(20)   NOT NULL,
+    ORD_ST_CD   CHAR(1)       NOT NULL COMMENT '0=주문확정 2=취소',
+    ITEM_CNT    INT           NOT NULL COMMENT '총 주문수량. 취소 row는 음수',
+    TOT_AMT     DECIMAL(12,0) NOT NULL COMMENT '취소 row는 음수',
+    TRX_DT      DATETIME(3)   NOT NULL,
+    REG_DT      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (ORD_NO),
+    KEY IX_TBTR_ORD_USR  (USR_ID, TRX_DT),
+    KEY IX_TBTR_ORD_OORD (OORD_NO)
+) COMMENT='수량제 상품 주문 원장 (INSERT-only)';
+
+CREATE TABLE IF NOT EXISTS TBTR_ORD_ITEM (
+    ORD_NO      VARCHAR(20)   NOT NULL,
+    PRD_NO      VARCHAR(20)   NOT NULL,
+    ORD_QTY     INT           NOT NULL COMMENT '취소 row는 음수',
+    PRD_PRC     DECIMAL(12,0) NOT NULL,
+    PRIMARY KEY (ORD_NO, PRD_NO)
+) COMMENT='주문 상품 상세';
+
+CREATE TABLE IF NOT EXISTS TBAD_CODE (
+    GRP_CD      VARCHAR(20) NOT NULL,
+    CODE        VARCHAR(10) NOT NULL,
+    DESC1       VARCHAR(50) NOT NULL,
+    SORT_NO     INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (GRP_CD, CODE)
+) COMMENT='공통코드';
