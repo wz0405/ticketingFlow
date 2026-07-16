@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketingflow.worker.mapper.LedgerMapper">
+
+    <!-- 원장은 INSERT-only. 재전달 멱등성은 PK + INSERT IGNORE로 보장 -->
+    <insert id="insertRsv">
+        INSERT IGNORE INTO TBTR_RSV
+               (RSV_NO, ORSV_NO, USR_ID, SCHD_NO, RSV_ST_CD, SEAT_CNT, TOT_AMT, TRX_DT)
+        VALUES (#{rsvNo}, #{orsvNo}, #{usrId}, #{schdNo}, #{rsvStCd}, #{seatCnt}, #{totAmt},
+                FROM_UNIXTIME(#{trxDt} / 1000))
+    </insert>
+
+    <insert id="insertRsvSeats">
+        INSERT IGNORE INTO TBTR_RSV_SEAT (RSV_NO, SEAT_NO, SEAT_PRC)
+        VALUES
+        <foreach collection="seats" item="seat" separator=",">
+            (#{rsvNo}, #{seat.seatNo}, #{seat.seatPrc})
+        </foreach>
+    </insert>
+
+    <insert id="insertRsvHist">
+        INSERT INTO TBTR_RSV_HIST (RSV_NO, RSV_ST_CD, HIST_MSG)
+        VALUES (#{rsvNo}, #{rsvStCd}, #{histMsg})
+    </insert>
+
+    <insert id="insertOrd">
+        INSERT IGNORE INTO TBTR_ORD
+               (ORD_NO, OORD_NO, USR_ID, SCHD_NO, ORD_ST_CD, ITEM_CNT, TOT_AMT, TRX_DT)
+        VALUES (#{ordNo}, #{oordNo}, #{usrId}, #{schdNo}, #{ordStCd}, #{itemCnt}, #{totAmt},
+                FROM_UNIXTIME(#{trxDt} / 1000))
+    </insert>
+
+    <!-- 취소 row는 sign=-1로 수량을 음수 적재 (잔여재고 = 초기재고 - SUM) -->
+    <insert id="insertOrdItems">
+        INSERT IGNORE INTO TBTR_ORD_ITEM (ORD_NO, PRD_NO, ORD_QTY, PRD_PRC)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{ordNo}, #{item.prdNo}, #{item.qty} * #{sign}, #{item.prdPrc})
+        </foreach>
+    </insert>
+
+</mapper>
