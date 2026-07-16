@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../session.dart';
 import '../api_client.dart';
@@ -19,6 +21,10 @@ class _MyHistoryScreenState extends State<MyHistoryScreen> with SingleTickerProv
   bool _isLoadingRsv = false;
   bool _isLoadingOrd = false;
 
+  // 원장 적재가 worker 비동기라 확정 직후엔 내역이 비어 보일 수 있다.
+  // 짧은 주기로 조용히(스피너 없이) 갱신해 최신 상태를 따라간다.
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -26,14 +32,19 @@ class _MyHistoryScreenState extends State<MyHistoryScreen> with SingleTickerProv
     _tabController = TabController(length: 2, vsync: this);
     _loadReservations();
     _loadOrders();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _loadReservations(silent: true);
+      _loadOrders(silent: true);
+    });
   }
 
-  Future<void> _loadReservations() async {
+  Future<void> _loadReservations({bool silent = false}) async {
     if (widget.session.usrId == null) return;
 
-    setState(() => _isLoadingRsv = true);
+    if (!silent) setState(() => _isLoadingRsv = true);
     try {
       final response = await _apiClient.myRsv(widget.session.usrId!);
+      if (!mounted) return;
 
       if (response.isSuccess && response.data != null) {
         final dataMap = response.data!;
@@ -43,18 +54,19 @@ class _MyHistoryScreenState extends State<MyHistoryScreen> with SingleTickerProv
         });
       }
     } catch (e) {
-      _showError('예매 내역 로드 실패: $e');
+      if (!silent) _showError('예매 내역 로드 실패: $e');
     } finally {
-      if (mounted) setState(() => _isLoadingRsv = false);
+      if (mounted && !silent) setState(() => _isLoadingRsv = false);
     }
   }
 
-  Future<void> _loadOrders() async {
+  Future<void> _loadOrders({bool silent = false}) async {
     if (widget.session.usrId == null) return;
 
-    setState(() => _isLoadingOrd = true);
+    if (!silent) setState(() => _isLoadingOrd = true);
     try {
       final response = await _apiClient.myOrd(widget.session.usrId!);
+      if (!mounted) return;
 
       if (response.isSuccess && response.data != null) {
         final dataMap = response.data!;
@@ -64,9 +76,9 @@ class _MyHistoryScreenState extends State<MyHistoryScreen> with SingleTickerProv
         });
       }
     } catch (e) {
-      _showError('주문 내역 로드 실패: $e');
+      if (!silent) _showError('주문 내역 로드 실패: $e');
     } finally {
-      if (mounted) setState(() => _isLoadingOrd = false);
+      if (mounted && !silent) setState(() => _isLoadingOrd = false);
     }
   }
 
@@ -529,6 +541,7 @@ class _MyHistoryScreenState extends State<MyHistoryScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }

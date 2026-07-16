@@ -24,7 +24,8 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     public static final String ATTR_USR_ID = "authUsrId";
 
-    private static final Set<String> PUBLIC_BIZ = Set.of("usrLogin", "eventList");
+    // demoLoad: 로그인 화면의 대기열 부하 데모 — 무인증 허용 (투입량은 핸들에서 제한)
+    private static final Set<String> PUBLIC_BIZ = Set.of("usrLogin", "eventList", "demoLoad");
 
     private final JwtSupport jwtSupport;
     private final ObjectMapper objectMapper;

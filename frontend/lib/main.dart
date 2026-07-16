@@ -23,6 +23,11 @@ class TicketingFlowApp extends StatelessWidget {
           seedColor: const Color(0xFF4B5BA8),
           brightness: Brightness.light,
         ),
+        // 하단 액션 버튼을 가리지 않도록 알림을 띄워서 위로 올린다
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          insetPadding: EdgeInsets.fromLTRB(16, 0, 16, 88),
+        ),
       ),
       home: const _RootNavigation(),
       debugShowCheckedModeBanner: false,

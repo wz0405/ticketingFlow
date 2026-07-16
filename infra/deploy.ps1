@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+$backend = Join-Path $root "backend"
 
 # deploy.config 로드
 $cfg = @{}
@@ -31,7 +32,7 @@ function Copy-Nas([string]$src, [string]$remote) {
 
 if (-not $SkipBuild) {
     Write-Host "[1/5] backend build"
-    Push-Location $root
+    Push-Location $backend
     ./gradlew bootJar -x test --console=plain
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw "gradle build failed" }
     Pop-Location
@@ -49,12 +50,13 @@ Write-Host "[2/5] prepare remote dirs"
 Invoke-Nas "mkdir -p $dir/jars $dir/nginx $dir/web"
 
 Write-Host "[3/5] upload artifacts"
-Copy-Nas "$root\queue-api\build\libs\queue-api-0.1.0.jar"   "$dir/jars/"
-Copy-Nas "$root\booking-api\build\libs\booking-api-0.1.0.jar" "$dir/jars/"
-Copy-Nas "$root\worker\build\libs\worker-0.1.0.jar"          "$dir/jars/"
+Copy-Nas "$backend\queue-api\build\libs\queue-api-0.1.0.jar"   "$dir/jars/"
+Copy-Nas "$backend\booking-api\build\libs\booking-api-0.1.0.jar" "$dir/jars/"
+Copy-Nas "$backend\worker\build\libs\worker-0.1.0.jar"          "$dir/jars/"
 Copy-Nas "$root\infra\docker\Dockerfile.app"                 "$dir/"
 Copy-Nas "$root\infra\docker-compose.yml"                    "$dir/"
 Copy-Nas "$root\infra\nginx\nginx.conf"                      "$dir/nginx/"
+Copy-Nas "$root\infra\nginx\routes.inc"                      "$dir/nginx/"
 if (-not $ApiOnly) {
     Copy-Nas "$($cfg.WEB_DIR)\build\web\*" "$dir/web/"
 }
@@ -64,6 +66,6 @@ $sudo = "echo '$($cfg.NAS_PASS)' | sudo -S"
 Invoke-Nas "$sudo sh -c 'cd $dir && /usr/local/bin/docker build -f Dockerfile.app --build-arg JAR_FILE=jars/queue-api-0.1.0.jar -t ticketingflow/queue-api:latest . && /usr/local/bin/docker build -f Dockerfile.app --build-arg JAR_FILE=jars/booking-api-0.1.0.jar -t ticketingflow/booking-api:latest . && /usr/local/bin/docker build -f Dockerfile.app --build-arg JAR_FILE=jars/worker-0.1.0.jar -t ticketingflow/worker:latest .' 2>&1 | grep -v -i password"
 
 Write-Host "[5/5] compose up"
-Invoke-Nas "$sudo sh -c 'cd $dir && /usr/local/bin/docker-compose up -d --remove-orphans && /usr/local/bin/docker ps --format \"table {{.Names}}\t{{.Status}}\"' 2>&1 | grep -v -i password"
+Invoke-Nas "$sudo sh -c 'cd $dir && /usr/local/bin/docker-compose up -d --remove-orphans && /usr/local/bin/docker ps' 2>&1 | grep -v -i password"
 
 Write-Host "deploy done: http://$($cfg.NAS_HOST):8080"

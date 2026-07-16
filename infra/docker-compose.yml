@@ -65,6 +65,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET}
+      # 데모 체감용 승격 속도 (기본 100/초는 순식간에 빠져 대기열이 안 보인다)
+      QUEUE_ADMIT_PER_TICK: ${QUEUE_ADMIT_PER_TICK:-20}
       JAVA_OPTS: -Xms128m -Xmx384m
     depends_on:
       - tr-redis-queue

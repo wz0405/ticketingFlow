@@ -92,6 +92,11 @@ class ApiClient {
     return post('eventList', {}, (data) => data as Map<String, dynamic>);
   }
 
+  // 데모: 가상 대기자 투입 (로그인 전 사용 가능)
+  Future<ApiResponse<Map<String, dynamic>>> demoLoad(String schdNo, int count) async {
+    return post('demoLoad', {'schdNo': schdNo, 'count': count}, (data) => data as Map<String, dynamic>);
+  }
+
   Future<ApiResponse<Map<String, dynamic>>> queueEnter(String schdNo, String usrId) async {
     return post('queueEnter', {'schdNo': schdNo, 'usrId': usrId}, (data) => data as Map<String, dynamic>);
   }

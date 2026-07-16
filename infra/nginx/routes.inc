@@ -6,7 +6,7 @@ location / {
 }
 
 # 대기열 업무만 queue-api로, 나머지는 booking-api로
-location ~ ^/api/(queueEnter|queueStatus|queueLeave)$ {
+location ~ ^/api/(queueEnter|queueStatus|queueLeave|demoLoad)$ {
     proxy_pass http://queue_api;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;

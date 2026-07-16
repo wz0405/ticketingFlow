@@ -23,7 +23,7 @@ management:
 
 ticketingflow:
   queue:
-    admit-per-tick: 100      # 틱당 입장 허용 인원
+    admit-per-tick: ${QUEUE_ADMIT_PER_TICK:100}   # 틱당 입장 허용 인원 (데모 환경은 낮춰 대기 체감을 만든다)
     tick-ms: 1000            # 승격 주기
     active-ttl-sec: 600      # 입장 후 예매 가능 시간(초)
     ws-port: 8091            # Netty WebSocket 푸시 포트
