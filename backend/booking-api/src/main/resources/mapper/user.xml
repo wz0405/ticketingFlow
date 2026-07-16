@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketingflow.booking.mapper.UserMapper">
+
+    <select id="selectByNm" resultType="com.ticketingflow.booking.domain.UsrRow">
+        SELECT tbmbUsr.USR_ID,
+               tbmbUsr.USR_NM
+          FROM TBMB_USR tbmbUsr
+         WHERE tbmbUsr.USR_NM = #{usrNm}
+    </select>
+
+    <insert id="insertUsr">
+        INSERT INTO TBMB_USR (USR_ID, USR_NM)
+        VALUES (#{usrId}, #{usrNm})
+    </insert>
+
+</mapper>
