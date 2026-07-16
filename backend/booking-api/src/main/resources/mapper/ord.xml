@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ticketingflow.booking.mapper.OrdMapper">
+
+    <select id="selectOrdForCancel" resultType="com.ticketingflow.booking.domain.OrdForCancel">
+        SELECT tbtrOrd.ORD_NO,
+               tbtrOrd.USR_ID,
+               tbtrOrd.SCHD_NO,
+               tbtrOrd.TOT_AMT,
+               tbtrOrd.ITEM_CNT,
+               COUNT(cnclOrd.ORD_NO) AS CNCL_CNT
+          FROM TBTR_ORD tbtrOrd
+          LEFT JOIN TBTR_ORD cnclOrd
+            ON cnclOrd.OORD_NO = tbtrOrd.ORD_NO
+           AND cnclOrd.ORD_ST_CD = '2'
+         WHERE tbtrOrd.ORD_NO = #{ordNo}
+           AND tbtrOrd.ORD_ST_CD = '0'
+         GROUP BY tbtrOrd.ORD_NO, tbtrOrd.USR_ID, tbtrOrd.SCHD_NO, tbtrOrd.TOT_AMT, tbtrOrd.ITEM_CNT
+    </select>
+
+    <select id="selectOrdItems" resultType="com.ticketingflow.booking.domain.OrdItemRow">
+        SELECT tbtrOrdItem.PRD_NO,
+               tbtrOrdItem.ORD_QTY,
+               tbtrOrdItem.PRD_PRC
+          FROM TBTR_ORD_ITEM tbtrOrdItem
+         WHERE tbtrOrdItem.ORD_NO = #{ordNo}
+         ORDER BY tbtrOrdItem.PRD_NO
+    </select>
+
+    <select id="selectMyOrds" resultType="com.ticketingflow.booking.domain.MyOrdRow">
+        SELECT tbtrOrd.ORD_NO,
+               tbtrOrd.SCHD_NO,
+               tbevEvnt.EVNT_NM,
+               tbtrOrd.ITEM_CNT,
+               tbtrOrd.TOT_AMT,
+               tbtrOrd.TRX_DT,
+               CASE WHEN COUNT(cnclOrd.ORD_NO) > 0 THEN '2' ELSE '0' END AS ORD_ST_CD,
+               GROUP_CONCAT(DISTINCT CONCAT(tbpdPrd.PRD_NM, ' x', tbtrOrdItem.ORD_QTY)
+                            ORDER BY tbpdPrd.PRD_NO SEPARATOR ', ') AS ITEM_DESC
+          FROM TBTR_ORD tbtrOrd
+          JOIN TBEV_SCHD tbevSchd
+            ON tbevSchd.SCHD_NO = tbtrOrd.SCHD_NO
+          JOIN TBEV_EVNT tbevEvnt
+            ON tbevEvnt.EVNT_NO = tbevSchd.EVNT_NO
+          JOIN TBTR_ORD_ITEM tbtrOrdItem
+            ON tbtrOrdItem.ORD_NO = tbtrOrd.ORD_NO
+          JOIN TBPD_PRD tbpdPrd
+            ON tbpdPrd.PRD_NO = tbtrOrdItem.PRD_NO
+          LEFT JOIN TBTR_ORD cnclOrd
+            ON cnclOrd.OORD_NO = tbtrOrd.ORD_NO
+           AND cnclOrd.ORD_ST_CD = '2'
+         WHERE tbtrOrd.USR_ID = #{usrId}
+           AND tbtrOrd.ORD_ST_CD = '0'
+         GROUP BY tbtrOrd.ORD_NO, tbtrOrd.SCHD_NO, tbevEvnt.EVNT_NM,
+                  tbtrOrd.ITEM_CNT, tbtrOrd.TOT_AMT, tbtrOrd.TRX_DT
+         ORDER BY tbtrOrd.TRX_DT DESC
+    </select>
+
+</mapper>
