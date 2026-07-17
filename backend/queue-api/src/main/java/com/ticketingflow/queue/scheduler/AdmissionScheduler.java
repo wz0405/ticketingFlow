@@ -93,8 +93,8 @@ public class AdmissionScheduler {
             return props.admitPerTick();
         }
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        if (waiting <= 40) {
-            return 8 + r.nextInt(11);            // 막판 가속: 8~18명씩 시원하게
+        if (waiting <= 30) {
+            return 7 + r.nextInt(9);             // 막판 가속: 7~15명씩 시원하게
         }
         double p = r.nextDouble();
         if (p < 0.12) {
@@ -104,8 +104,9 @@ public class AdmissionScheduler {
             return 2 + r.nextInt(5);             // 평상: 2~6명 찔끔찔끔
         }
         if (p < 0.93) {
-            return 10 + r.nextInt(9);            // 웨이브: 10~18명
+            return 8 + r.nextInt(8);             // 웨이브: 8~15명
         }
-        return 30 + r.nextInt(26);               // 버스트: 30~55명 우르르
+        // 버스트: 우르르 빠지되, 잔여의 절반을 넘지 않게 — 작은 큐에서도 여러 번 낙폭이 보이게
+        return (int) Math.min(25 + r.nextInt(21), Math.max(12, waiting / 2));
     }
 }

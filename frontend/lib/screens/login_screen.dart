@@ -42,8 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // 가상 대기자 먼저 투입 — 실패해도 체험 흐름은 계속 진행
-      // 200명 ≈ 30초 내외 완주(면접관 인내심 배려). 더 보고 싶으면 대기 화면의 +100 버튼
-      await _apiClient.demoLoad(schdNo, 200);
+      // 100명 ≈ 15~20초 완주(면접관 인내심 배려). 더 보고 싶으면 대기 화면의 +100 버튼
+      await _apiClient.demoLoad(schdNo, 100);
 
       final guestNm = '게스트${1000 + Random().nextInt(9000)}';
       final login = await _apiClient.usrLogin(guestNm);
@@ -211,14 +211,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         )
                       : const Icon(Icons.rocket_launch),
                   label: const Text(
-                    '바로 체험하기 — 대기열 200명 뚫고 입장',
+                    '바로 체험하기 — 대기열 100명 뚫고 입장',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                '클릭 한 번으로 가상 대기자 200명 뒤에 줄을 섭니다.\n'
+                '클릭 한 번으로 가상 대기자 100명 뒤에 줄을 섭니다.\n'
                 '순번이 불규칙하게 빠지는 것(정체·버스트)까지가 설계입니다.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),

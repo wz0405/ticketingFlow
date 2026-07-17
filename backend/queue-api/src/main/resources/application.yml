@@ -31,7 +31,7 @@ ticketingflow:
     # 데모 가변 배출 — 정체/찔끔/웨이브/버스트를 섞어 대기열이 살아있는 것처럼 줄어들게 한다
     demo-dynamic-admit: ${QUEUE_DEMO_DYNAMIC:true}
     demo-dynamic-max-queue: ${QUEUE_DEMO_MAX:1000}   # 이 인원 초과(부하테스트)면 고정 배출로 전환
-    demo-avg-admit-per-sec: 8.0                      # 가변 배출 평균 처리율(ETA 계산용)
+    demo-avg-admit-per-sec: 7.0                      # 가변 배출 평균 처리율(ETA 계산용)
   jwt:
     secret: ${JWT_SECRET:ticketingflow-dev-secret-please-override-with-32byte-min-key}
     expiry-minutes: 120
