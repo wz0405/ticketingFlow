@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../session.dart';
 import '../api_client.dart';
@@ -26,6 +27,42 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _apiClient.init();
+  }
+
+  /// 원클릭 체험: 가상 대기자 300명을 먼저 줄 세우고, 게스트로 로그인해
+  /// 그 뒤(301번째)에 서서 대기열이 소화되는 과정을 바로 보여준다.
+  Future<void> _handleQuickDemo() async {
+    setState(() => _isLoading = true);
+    try {
+      await _loadSchds();
+      final schdNo = _selSchdNo;
+      if (schdNo == null || schdNo.isEmpty) {
+        _showError('진행 중인 회차가 없습니다.');
+        return;
+      }
+
+      // 가상 대기자 먼저 투입 — 실패해도 체험 흐름은 계속 진행
+      // 200명 ≈ 30초 내외 완주(면접관 인내심 배려). 더 보고 싶으면 대기 화면의 +100 버튼
+      await _apiClient.demoLoad(schdNo, 200);
+
+      final guestNm = '게스트${1000 + Random().nextInt(9000)}';
+      final login = await _apiClient.usrLogin(guestNm);
+      if (!mounted) return;
+      if (!login.isSuccess || login.data == null) {
+        _showError(login.rsltMsg);
+        return;
+      }
+      _apiClient.authToken = login.data!['accessToken'] as String?;
+      widget.session.setLogin(
+        login.data!['usrId'] as String? ?? '',
+        login.data!['usrNm'] as String? ?? '',
+      );
+      widget.session.enterQueue(schdNo);
+    } catch (e) {
+      _showError('체험 시작 실패: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -125,7 +162,9 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // 로고 영역
@@ -151,12 +190,52 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '쉽고 빠른 티켓 예매 서비스',
+                '대규모 트래픽 대기열 시스템 데모 · Redis / Lua / Streams',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Colors.grey[600],
                     ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
+              // 원클릭 체험 — 이 데모의 메인 진입점
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton.icon(
+                  onPressed: _isLoading ? null : _handleQuickDemo,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.rocket_launch),
+                  label: const Text(
+                    '바로 체험하기 — 대기열 200명 뚫고 입장',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '클릭 한 번으로 가상 대기자 200명 뒤에 줄을 섭니다.\n'
+                '순번이 불규칙하게 빠지는 것(정체·버스트)까지가 설계입니다.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('또는 이름으로 입장',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[500])),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 20),
               // 입력 폼
               TextField(
                 controller: _usrNmController,
@@ -257,10 +336,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 40),
+              _buildInfoImage(context, '시스템 아키텍처', 'arch.png'),
+              const SizedBox(height: 28),
+              _buildInfoImage(context, '부하테스트 — k6 · 200 VU · 120s (개선 전 → 후)', 'loadtest.png'),
+              const SizedBox(height: 16),
             ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 랜딩 하단 정보 이미지 섹션. 파일이 없으면 조용히 숨긴다.
+  Widget _buildInfoImage(BuildContext context, String title, String file) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            file,
+            width: double.infinity,
+            fit: BoxFit.fitWidth,
+            errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+          ),
+        ),
+      ],
     );
   }
 

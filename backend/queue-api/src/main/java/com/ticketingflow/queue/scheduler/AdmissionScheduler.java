@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 입장 승격 스케줄러.
@@ -50,8 +51,12 @@ public class AdmissionScheduler {
     }
 
     private void admitForSchd(String schdNo) {
+        int admitN = admitCountFor(schdNo);
+        if (admitN <= 0) {
+            return;
+        }
         Set<TypedTuple<String>> popped =
-                queueRedis.opsForZSet().popMin(RedisKeys.waitingQueue(schdNo), props.admitPerTick());
+                queueRedis.opsForZSet().popMin(RedisKeys.waitingQueue(schdNo), admitN);
         if (popped == null || popped.isEmpty()) {
             return;
         }
@@ -67,5 +72,40 @@ public class AdmissionScheduler {
             return null;
         });
         log.debug("admitted {} users for schd {}", popped.size(), schdNo);
+    }
+
+    /**
+     * 이번 틱의 배출 인원 결정.
+     * 데모 모드에서는 고정 배출 대신 [정체 / 찔끔 / 웨이브 / 버스트]를 확률적으로 섞어
+     * 대기열이 살아있는 것처럼 불규칙하게 줄어들게 한다. 잔여가 적으면 시원하게 마무리.
+     * 대기 인원이 demoDynamicMaxQueue를 넘으면(부하테스트) 기존 고정 배출을 유지한다.
+     */
+    private int admitCountFor(String schdNo) {
+        if (!props.demoDynamicAdmit()) {
+            return props.admitPerTick();
+        }
+        Long total = queueRedis.opsForZSet().zCard(RedisKeys.waitingQueue(schdNo));
+        long waiting = total == null ? 0 : total;
+        if (waiting == 0) {
+            return 0;
+        }
+        if (waiting > props.demoDynamicMaxQueue()) {
+            return props.admitPerTick();
+        }
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        if (waiting <= 40) {
+            return 8 + r.nextInt(11);            // 막판 가속: 8~18명씩 시원하게
+        }
+        double p = r.nextDouble();
+        if (p < 0.12) {
+            return 0;                            // 정체 — 멈칫하는 긴장감
+        }
+        if (p < 0.75) {
+            return 2 + r.nextInt(5);             // 평상: 2~6명 찔끔찔끔
+        }
+        if (p < 0.93) {
+            return 10 + r.nextInt(9);            // 웨이브: 10~18명
+        }
+        return 30 + r.nextInt(26);               // 버스트: 30~55명 우르르
     }
 }

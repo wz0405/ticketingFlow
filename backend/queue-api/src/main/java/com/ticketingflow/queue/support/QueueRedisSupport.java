@@ -81,7 +81,7 @@ public class QueueRedisSupport {
         }
         Long total = queueRedis.opsForZSet().zCard(RedisKeys.waitingQueue(schdNo));
         long position = rank + 1;
-        double ratePerSec = props.admitPerTick() * (1000.0 / props.tickMs());
+        double ratePerSec = effectiveRatePerSec(total == null ? position : total);
         long etaSec = (long) Math.ceil(position / ratePerSec);
         out.put("inQueue", true);
         out.put("position", position);
@@ -89,6 +89,14 @@ public class QueueRedisSupport {
         out.put("etaSec", etaSec);
         out.put("pollAfterMs", pollAfterMs(etaSec));
         return out;
+    }
+
+    /** 가변 배출 구간에서는 평균 처리율로, 그 외에는 고정 배출 기준으로 ETA를 계산한다 */
+    private double effectiveRatePerSec(long totalWaiting) {
+        if (props.demoDynamicAdmit() && totalWaiting <= props.demoDynamicMaxQueue()) {
+            return props.demoAvgAdmitPerSec();
+        }
+        return props.admitPerTick() * (1000.0 / props.tickMs());
     }
 
     /** 입장 예상 시간이 멀수록 폴링 주기를 늘린다 (서버 주도 어댑티브 폴링) */

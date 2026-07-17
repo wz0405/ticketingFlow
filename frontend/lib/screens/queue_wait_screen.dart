@@ -142,6 +142,26 @@ class _QueueWaitScreenState extends State<QueueWaitScreen> with TickerProviderSt
     }
   }
 
+  /// 데모: 내 뒤로 가상 대기자를 추가해 실시간 유입(전체 대기 증가)을 보여준다.
+  /// 신규 봇의 score는 현재 시각이라 내 순번에는 영향이 없다.
+  Future<void> _handleAddCrowd() async {
+    if (widget.session.schdNo == null) return;
+    try {
+      final response = await _apiClient.demoLoad(widget.session.schdNo!, 100);
+      if (!mounted) return;
+      if (response.isSuccess && response.data != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('대기자 100명이 뒤에 합류했습니다 (전체 ${response.data!['totalWaiting']}명)'),
+            backgroundColor: Colors.green[700],
+          ),
+        );
+      }
+    } catch (_) {
+      // 데모 부가 기능 — 실패해도 대기 흐름은 유지
+    }
+  }
+
   Future<void> _handleLeaveQueue() async {
     if (widget.session.schdNo == null || widget.session.usrId == null) return;
 
@@ -265,6 +285,17 @@ class _QueueWaitScreenState extends State<QueueWaitScreen> with TickerProviderSt
                     ],
                   ),
                 const SizedBox(height: 48),
+                // 데모: 실시간 유입 시뮬레이션 — 내 뒤로 가상 대기자 추가
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _handleAddCrowd,
+                    icon: const Icon(Icons.groups),
+                    label: const Text('실시간 유입 시뮬레이션 — 내 뒤로 +100명'),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 // 나가기 버튼
                 SizedBox(
                   width: double.infinity,

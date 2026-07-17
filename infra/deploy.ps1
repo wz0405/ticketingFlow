@@ -68,4 +68,8 @@ Invoke-Nas "$sudo sh -c 'cd $dir && /usr/local/bin/docker build -f Dockerfile.ap
 Write-Host "[5/5] compose up"
 Invoke-Nas "$sudo sh -c 'cd $dir && /usr/local/bin/docker-compose up -d --remove-orphans && /usr/local/bin/docker ps' 2>&1 | grep -v -i password"
 
+# 컨테이너 재생성으로 내부 IP가 바뀌면 nginx의 upstream DNS 캐시가 낡아 502가 난다 — 리로드로 재해석
+Write-Host "[6/6] nginx upstream re-resolve"
+Invoke-Nas "{ $sudo /usr/local/bin/docker exec tr-nginx nginx -s reload; } 2>&1 | grep -v -i password || true"
+
 Write-Host "deploy done: http://$($cfg.NAS_HOST):8080"
